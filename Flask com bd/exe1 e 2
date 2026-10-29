@@ -1,0 +1,97 @@
+import os
+from datetime import datetime, timezone
+from bson import ObjectId
+from bson.errors import InvalidId
+from flask import Flask, jsonify, request
+from pymongo import MongoClient
+
+app = Flask(__name__)
+col = MongoClient(os.environ.get('MONGO_URI', 'mongodb://localhost:27017/'))['seguranca']['incidentes']
+
+SEVERIDADES = ('baixa', 'media', 'alta', 'critica')
+STATUS = ('aberto', 'em_analise', 'resolvido')
+
+def serializar(d):
+    d['_id'] = str(d['_id'])                 # ObjectId não vira JSON
+    if 'criado_em' in d:
+        d['criado_em'] = d['criado_em'].isoformat()
+    return d
+
+def como_oid(id):
+    try:
+        return ObjectId(id)
+    except InvalidId:
+        return None
+
+def inteiro(nome, padrao, maximo=None):
+    try:
+        v = max(int(request.args.get(nome, padrao)), 1)
+    except ValueError:
+        v = padrao
+    return min(v, maximo) if maximo else v
+
+@app.route('/api/incidentes', methods=['POST'])
+def criar():
+    d = request.get_json(silent=True)
+    if not isinstance(d, dict) or not d.get('titulo') or d.get('severidade') not in SEVERIDADES:
+        return jsonify({'erro': 'titulo e severidade válida são obrigatórios'}), 400
+    if d.get('status', 'aberto') not in STATUS:
+        return jsonify({'erro': 'status inválido'}), 400
+    doc = {
+        'titulo': d['titulo'], 'severidade': d['severidade'],
+        'status': d.get('status', 'aberto'), 'ip_origem': d.get('ip_origem'),
+        'criado_em': datetime.now(timezone.utc),
+    }
+    r = col.insert_one(doc)
+    return jsonify({'id': str(r.inserted_id)}), 201
+
+# 7.2: paginação (?pagina=&tamanho=), filtros (?severidade=&status=) e ordenação
+@app.route('/api/incidentes', methods=['GET'])
+def listar():
+    pagina = inteiro('pagina', 1)
+    tamanho = inteiro('tamanho', 10, maximo=100)   # teto: ninguém pede 1 milhão de linhas
+    filtro = {}
+    for campo in ('severidade', 'status'):
+        valor = request.args.get(campo)
+        if valor:
+            filtro[campo] = valor
+    cursor = (col.find(filtro).sort('criado_em', -1)
+                 .skip((pagina - 1) * tamanho).limit(tamanho))
+    return jsonify([serializar(d) for d in cursor])
+
+@app.route('/api/incidentes/<id>', methods=['GET'])
+def obter(id):
+    oid = como_oid(id)
+    if oid is None:
+        return jsonify({'erro': 'id inválido'}), 400
+    doc = col.find_one({'_id': oid})
+    if doc is None:
+        return jsonify({'erro': 'não encontrado'}), 404
+    return jsonify(serializar(doc))
+
+@app.route('/api/incidentes/<id>', methods=['PUT'])
+def atualizar(id):
+    oid = como_oid(id)
+    if oid is None:
+        return jsonify({'erro': 'id inválido'}), 400
+    d = request.get_json(silent=True)
+    if not isinstance(d, dict):
+        return jsonify({'erro': 'corpo inválido'}), 400
+    novo = {k: d[k] for k in ('titulo', 'severidade', 'status', 'ip_origem') if k in d}
+    if novo.get('severidade', 'baixa') not in SEVERIDADES or novo.get('status', 'aberto') not in STATUS:
+        return jsonify({'erro': 'severidade ou status inválido'}), 400
+    if not novo:
+        return jsonify({'erro': 'nada para atualizar'}), 400
+    r = col.update_one({'_id': oid}, {'$set': novo})
+    if r.matched_count == 0:
+        return jsonify({'erro': 'não encontrado'}), 404
+    return jsonify({'mensagem': 'Atualizado'}), 200
+
+@app.route('/api/incidentes/<id>', methods=['DELETE'])
+def remover(id):
+    oid = como_oid(id)
+    if oid is None:
+        return jsonify({'erro': 'id inválido'}), 400
+    if col.delete_one({'_id': oid}).deleted_count == 0:
+        return jsonify({'erro': 'não encontrado'}), 404
+    return jsonify({'mensagem': 'Removido'}), 200

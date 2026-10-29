@@ -1,0 +1,36 @@
+import os
+from datetime import datetime
+from pymongo import MongoClient
+
+col = MongoClient(os.environ.get('MONGO_URI', 'mongodb://localhost:27017/'))['seguranca']['eventos']
+col.delete_many({'fonte': 'auth'})   # evita duplicar se eu rodar duas vezes
+
+# Formato: 2025-02-20 08:15:01 FAIL usuario=admin ip=185.220.101.1
+docs = []
+with open('auth.log', encoding='utf-8') as f:
+    for linha in f:
+        partes = linha.split()
+        if len(partes) < 5:
+            continue   # linha vazia ou quebrada
+        campos = dict(p.split('=', 1) for p in partes[3:] if '=' in p)
+        docs.append({
+            'timestamp': datetime.strptime(partes[0] + ' ' + partes[1], '%Y-%m-%d %H:%M:%S'),
+            'fonte': 'auth',
+            'tipo': partes[2],
+            'ip': campos.get('ip'),
+            'detalhes': {'usuario': campos.get('usuario')},
+        })
+
+if docs:
+    col.insert_many(docs)   # um insert só, bem mais rápido que um por linha
+
+pipeline = [
+    {'$match': {'tipo': 'FAIL'}},
+    {'$group': {'_id': '$ip', 'total': {'$sum': 1}}},
+    {'$sort': {'total': -1}},
+    {'$limit': 5},
+]
+print('=== Top IPs por falhas de login ===')
+for l in col.aggregate(pipeline):
+    print('%s -> %d falhas' % (l['_id'], l['total']))
+print('Total de eventos inseridos:', len(docs))

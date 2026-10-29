@@ -1,0 +1,21 @@
+import os
+import mysql.connector
+
+con = mysql.connector.connect(host='localhost', user='root',
+                              password=os.environ['MYSQL_PASSWORD'], database='seguranca')
+cur = con.cursor()
+
+def buscar_inseguro(nome):
+    # ERRADO: concatena a entrada dentro do SQL
+    consulta = "SELECT * FROM usuarios WHERE nome = '" + nome + "'"
+    cur.execute(consulta)
+    return cur.fetchall()
+
+def buscar_seguro(nome):
+    # CERTO: o driver manda a entrada separada, como dado
+    cur.execute('SELECT * FROM usuarios WHERE nome = %s', (nome,))
+    return cur.fetchall()
+
+entrada = "' OR '1'='1"
+print('[INSEGURO] entrada: %s -> %d usuários retornados (VAZAMENTO!)' % (entrada, len(buscar_inseguro(entrada))))
+print('[SEGURO]   entrada: %s -> %d usuários retornados (defesa OK)' % (entrada, len(buscar_seguro(entrada))))

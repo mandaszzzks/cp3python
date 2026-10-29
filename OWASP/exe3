@@ -1,0 +1,38 @@
+import os
+import time
+import mysql.connector
+from flask import Flask, jsonify, request
+from werkzeug.security import check_password_hash, generate_password_hash
+
+app = Flask(__name__)
+tentativas = {}
+LIMITE = 5
+JANELA = 300
+HASH_FALSO = generate_password_hash('x')
+
+def conectar():
+    return mysql.connector.connect(host='localhost', user='root',
+                                   password=os.environ['MYSQL_PASSWORD'], database='seguranca')
+
+@app.route('/login', methods=['POST'])
+def login():
+    ip = request.remote_addr
+    agora = time.time()
+    recentes = [t for t in tentativas.get(ip, []) if agora - t < JANELA]
+    if len(recentes) >= LIMITE:
+        return jsonify({'erro': 'muitas tentativas, tente mais tarde'}), 429
+    d = request.get_json(silent=True)
+    if not isinstance(d, dict) or not d.get('usuario') or not d.get('senha'):
+        return jsonify({'erro': 'usuario e senha obrigatórios'}), 400
+    con = conectar()
+    cur = con.cursor()
+    cur.execute('SELECT senha_hash FROM usuarios_login WHERE usuario = %s', (d['usuario'],))
+    linha = cur.fetchone()
+    con.close()
+    ok = check_password_hash(linha[0] if linha else HASH_FALSO, d['senha'])
+    if not (linha and ok):
+        recentes.append(agora)
+        tentativas[ip] = recentes
+        return jsonify({'erro': 'Credenciais inválidas'}), 401
+    tentativas.pop(ip, None)
+    return jsonify({'mensagem': 'Login OK'}), 200

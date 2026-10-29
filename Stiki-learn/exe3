@@ -1,0 +1,21 @@
+import hashlib
+import joblib
+
+def sha256(caminho):
+    h = hashlib.sha256()
+    with open(caminho, 'rb') as f:
+        for bloco in iter(lambda: f.read(8192), b''):
+            h.update(bloco)
+    return h.hexdigest()
+
+joblib.dump(busca.best_estimator_, 'modelo_seguranca.pkl')
+hash_salvo = sha256('modelo_seguranca.pkl')
+print('Modelo salvo: modelo_seguranca.pkl')
+print('Hash SHA-256:', hash_salvo)
+
+print('Recarregando e verificando integridade...')
+if sha256('modelo_seguranca.pkl') != hash_salvo:
+    print('ALERTA: arquivo do modelo foi modificado!')
+else:
+    modelo = joblib.load('modelo_seguranca.pkl')
+    print('Hash confere: modelo íntegro. Previsão de teste:', modelo.predict([[52000, 6666, 17.0]]).tolist())

@@ -1,0 +1,17 @@
+import ipaddress
+from flask import Flask, jsonify
+
+app = Flask(__name__)
+BLACKLIST = {'185.220.101.1', '45.33.32.156', '91.240.118.172'}
+
+@app.route('/api/checar-ip/<ip>', methods=['GET'])
+def checar_ip(ip):
+    try:
+        obj = ipaddress.ip_address(ip)
+    except ValueError:
+        return jsonify({'erro': 'IP inválido'}), 400
+    return jsonify({
+        'ip': ip,
+        'na_blacklist': ip in BLACKLIST,
+        'tipo': 'privado' if obj.is_private else 'publico',
+    })

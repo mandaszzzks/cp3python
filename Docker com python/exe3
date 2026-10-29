@@ -1,0 +1,23 @@
+import time
+from datetime import datetime
+import docker
+from docker.errors import NotFound
+
+client = docker.from_env()
+NOME = 'web_lab'
+
+for _ in range(6):
+    hora = datetime.now().strftime('%H:%M:%S')
+    try:
+        c = client.containers.get(NOME)
+        c.reload()
+    except NotFound:
+        print('[%s] %s não existe' % (hora, NOME))
+        break
+    if c.status == 'running':
+        print('[%s] %s: running - OK' % (hora, NOME))
+    else:
+        print('[%s] %s: %s - ALERTA! Tentando reiniciar...' % (hora, NOME, c.status))
+        c.restart()
+        print('[%s] %s reiniciado com sucesso.' % (datetime.now().strftime('%H:%M:%S'), NOME))
+    time.sleep(10)

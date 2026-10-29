@@ -1,0 +1,11 @@
+from sklearn.metrics import (confusion_matrix, precision_score, recall_score,
+                             f1_score, accuracy_score)
+
+y_verdadeiro = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1]
+y_previsto   = [0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+
+print('Matriz:', confusion_matrix(y_verdadeiro, y_previsto).tolist())   # [[8, 0], [1, 1]]
+print('Precisão: %.2f' % precision_score(y_verdadeiro, y_previsto))     # 1.00
+print('Recall:   %.2f' % recall_score(y_verdadeiro, y_previsto))        # 0.50
+print('F1:       %.2f' % f1_score(y_verdadeiro, y_previsto))            # 0.67
+print('Acurácia: %.2f' % accuracy_score(y_verdadeiro, y_previsto))      # 0.90

@@ -1,0 +1,65 @@
+import os
+from pymongo import MongoClient
+from pymongo.errors import DuplicateKeyError
+
+client = MongoClient(os.environ.get('MONGO_URI', 'mongodb://localhost:27017/'))
+ativos = client['seguranca']['ativos']
+ativos.create_index('ip', unique=True)
+
+INICIAIS = [
+    {'nome': 'SRV-WEB01', 'tipo': 'servidor', 'ip': '192.168.1.10', 'status': 'ativo'},
+    {'nome': 'PC-RH03',   'tipo': 'estacao',  'ip': '192.168.1.45', 'status': 'ativo'},
+    {'nome': 'SW-CORE01', 'tipo': 'switch',   'ip': '192.168.1.1',  'status': 'inativo'},
+]
+
+def popular():
+    for a in INICIAIS:
+        try:
+            ativos.insert_one(dict(a))   # dict(a): o insert_one mexe no dicionário original
+        except DuplicateKeyError:
+            pass                          # já existe, segue o jogo
+
+def cadastrar():
+    nome = input('Nome: ').strip()
+    tipo = input('Tipo: ').strip()
+    ip = input('IP: ').strip()
+    if not nome or not ip:
+        print('Nome e IP são obrigatórios.')
+        return
+    try:
+        ativos.insert_one({'nome': nome, 'tipo': tipo, 'ip': ip, 'status': 'ativo'})
+        print('Ativo cadastrado!')
+    except DuplicateKeyError:
+        print('Erro: IP já cadastrado!')
+
+def listar():
+    print('%-12s %-10s %-15s %s' % ('NOME', 'TIPO', 'IP', 'STATUS'))
+    for a in ativos.find({}, {'_id': 0}).sort('nome', 1):
+        print('%-12s %-10s %-15s %s' % (a['nome'], a['tipo'], a['ip'], a['status']))
+
+def buscar():
+    a = ativos.find_one({'ip': input('IP: ').strip()}, {'_id': 0})
+    print(a if a else 'Não encontrado.')
+
+def atualizar():
+    ip = input('IP: ').strip()
+    st = input('Novo status (ativo/inativo): ').strip()
+    if st not in ('ativo', 'inativo'):
+        print('Status inválido.')
+        return
+    r = ativos.update_one({'ip': ip}, {'$set': {'status': st}})
+    print('Status atualizado!' if r.matched_count else 'IP não encontrado.')
+
+def remover():
+    r = ativos.delete_one({'ip': input('IP: ').strip()})
+    print('Removido!' if r.deleted_count else 'IP não encontrado.')
+
+MENU = {'1': cadastrar, '2': listar, '3': buscar, '4': atualizar, '5': remover}
+
+popular()
+while True:
+    print('[1] Cadastrar [2] Listar [3] Buscar por IP [4] Atualizar status [5] Remover [6] Sair')
+    op = input('> ').strip()
+    if op == '6':
+        break
+    MENU.get(op, lambda: print('Opção inválida'))()

@@ -1,0 +1,32 @@
+from flask import Flask, request, render_template_string, redirect
+
+app = Flask(__name__)
+alertas = []
+
+PAGINA = '''<!doctype html>
+<title>Alertas</title>
+<h1>Alertas</h1>
+<form method='post'>
+  <input name='tipo' placeholder='Tipo'>
+  <input name='descricao' placeholder='Descrição'>
+  <button>Cadastrar</button>
+</form>
+<ul>{% for a in alertas %}<li>{{ a.tipo }}: {{ a.descricao }}</li>{% endfor %}</ul>'''
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    if request.method == 'POST':
+        alertas.append({'tipo': request.form.get('tipo', '')[:50],
+                        'descricao': request.form.get('descricao', '')[:200]})
+        return redirect('/')
+    return render_template_string(PAGINA, alertas=alertas)
+
+@app.after_request
+def headers(resp):
+    resp.headers['X-Content-Type-Options'] = 'nosniff'
+    resp.headers['X-Frame-Options'] = 'DENY'
+    resp.headers['Content-Security-Policy'] = "default-src 'self'"
+    return resp
+
+if __name__ == '__main__':
+    app.run(debug=False)

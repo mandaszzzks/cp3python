@@ -1,0 +1,80 @@
+import os
+import mysql.connector
+from mysql.connector import IntegrityError
+
+con = mysql.connector.connect(host='localhost', user='root',
+                              password=os.environ['MYSQL_PASSWORD'], database='seguranca')
+cur = con.cursor()
+
+cur.execute(
+    'CREATE TABLE IF NOT EXISTS usuarios ('
+    'id INT AUTO_INCREMENT PRIMARY KEY, '
+    'nome VARCHAR(100) NOT NULL, '
+    'email VARCHAR(150) NOT NULL UNIQUE, '
+    'nivel_acesso INT NOT NULL DEFAULT 1, '
+    'CHECK (nivel_acesso BETWEEN 1 AND 5))'
+)
+cur.executemany('INSERT IGNORE INTO usuarios (nome, email, nivel_acesso) VALUES (%s, %s, %s)', [
+    ('Carlos Silva', 'carlos@empresa.com', 3),
+    ('Ana Costa', 'ana@empresa.com', 5),
+    ('Bruno Lima', 'bruno@empresa.com', 1),
+])
+con.commit()
+
+def pedir_nivel():
+    try:
+        n = int(input('Nível (1-5): '))
+    except ValueError:
+        return None
+    return n if 1 <= n <= 5 else None
+
+def cadastrar():
+    nome = input('Nome: ').strip()
+    email = input('Email: ').strip()
+    nivel = pedir_nivel()
+    if not nome or not email or nivel is None:
+        print('Dados inválidos.')
+        return
+    try:
+        cur.execute('INSERT INTO usuarios (nome, email, nivel_acesso) VALUES (%s, %s, %s)',
+                    (nome, email, nivel))
+        con.commit()
+        print('Usuário cadastrado!')
+    except IntegrityError:
+        con.rollback()
+        print('Erro: email já existe')
+
+def listar():
+    cur.execute('SELECT nome, email, nivel_acesso FROM usuarios ORDER BY id')
+    for nome, email, nivel in cur.fetchall():
+        print('%-14s | %-20s | nível %d' % (nome, email, nivel))
+
+def buscar():
+    cur.execute('SELECT nome, email, nivel_acesso FROM usuarios WHERE email = %s',
+                (input('Email: ').strip(),))
+    r = cur.fetchone()
+    print('%s | %s | nível %d' % r if r else 'Não encontrado.')
+
+def alterar_nivel():
+    email = input('Email: ').strip()
+    nivel = pedir_nivel()
+    if nivel is None:
+        print('Nível inválido (use 1 a 5).')
+        return
+    cur.execute('UPDATE usuarios SET nivel_acesso = %s WHERE email = %s', (nivel, email))
+    con.commit()
+    print('Nível atualizado!' if cur.rowcount else 'Email não encontrado.')
+
+def remover():
+    cur.execute('DELETE FROM usuarios WHERE email = %s', (input('Email: ').strip(),))
+    con.commit()
+    print('Removido!' if cur.rowcount else 'Email não encontrado.')
+
+MENU = {'1': cadastrar, '2': listar, '3': buscar, '4': alterar_nivel, '5': remover}
+while True:
+    print('[1] Cadastrar [2] Listar [3] Buscar [4] Promover/Rebaixar [5] Remover [6] Sair')
+    op = input('> ').strip()
+    if op == '6':
+        break
+    MENU.get(op, lambda: print('Opção inválida'))()
+con.close()

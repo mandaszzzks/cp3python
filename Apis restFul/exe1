@@ -1,0 +1,38 @@
+import requests
+
+URL = 'https://services.nvd.nist.gov/rest/json/cves/2.0'
+
+def buscar_cve(cve_id):
+    try:
+        r = requests.get(URL, params={'cveId': cve_id}, timeout=30)
+    except requests.exceptions.Timeout:
+        print('Tempo esgotado')
+        return
+    except requests.exceptions.RequestException:
+        print('Erro de conexão')
+        return
+    if r.status_code == 404:
+        print('CVE não encontrada')
+        return
+    if r.status_code != 200:
+        print('Erro HTTP', r.status_code)
+        return
+    vulns = r.json().get('vulnerabilities')
+    if not vulns:
+        print('CVE não encontrada')
+        return
+    cve = vulns[0]['cve']
+    desc = next((d['value'] for d in cve['descriptions'] if d['lang'] == 'en'), '')
+    score, sev = None, None
+    for chave in ('cvssMetricV31', 'cvssMetricV30', 'cvssMetricV2'):
+        if chave in cve.get('metrics', {}):
+            m = cve['metrics'][chave][0]
+            score = m['cvssData']['baseScore']
+            sev = m['cvssData'].get('baseSeverity') or m.get('baseSeverity')
+            break
+    print(cve_id)
+    print('  CVSS: %s (%s)' % (score, sev))
+    print('  Descrição:', desc[:200])
+
+buscar_cve('CVE-2021-44228')
+buscar_cve('CVE-1999-0000000')

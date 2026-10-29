@@ -1,0 +1,22 @@
+-- (a) inserir 3+ alertas (usei 4 para bater com a saída esperada)
+INSERT INTO alertas (tipo, ip_origem, severidade) VALUES
+    ('BRUTE_FORCE', '185.220.101.1', 'critica'),
+    ('PORT_SCAN',   '192.168.1.50',  'alta'),
+    ('XSS',         '45.33.32.156',  'alta'),
+    ('SQLI',        '10.0.0.7',      'media');
+
+-- (b) só os de severidade alta
+SELECT * FROM alertas WHERE severidade = 'alta';
+
+-- (c) marcar um como resolvido
+UPDATE alertas SET status = 'resolvido' WHERE id = 2;
+
+-- (d) contagem por severidade (FIELD() ordena do mais grave para o menos)
+SELECT severidade, COUNT(*) AS total
+FROM alertas
+GROUP BY severidade
+ORDER BY FIELD(severidade, 'critica', 'alta', 'media', 'baixa');
+-- critica 1 | alta 2 | media 1
+
+-- (e) apagar alertas com mais de 90 dias
+DELETE FROM alertas WHERE criado_em < NOW() - INTERVAL 90 DAY;

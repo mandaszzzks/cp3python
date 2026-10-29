@@ -1,0 +1,75 @@
+import json
+import requests
+
+BASE = 'https://api.github.com'
+estado = {'usuario': None, 'repos': []}
+
+def get(caminho, params=None):
+    try:
+        r = requests.get(BASE + caminho, params=params, timeout=15)
+    except requests.exceptions.Timeout:
+        print('Tempo esgotado')
+        return None
+    except requests.exceptions.RequestException:
+        print('Erro de conexão')
+        return None
+    if r.status_code in (403, 429):
+        print('Limite de requisições atingido, tente mais tarde')
+        return None
+    if r.status_code == 404:
+        print('Não encontrado')
+        return None
+    if r.status_code != 200:
+        print('Erro HTTP', r.status_code)
+        return None
+    return r.json()
+
+def buscar_usuario():
+    u = get('/users/' + input('Usuário: ').strip())
+    if u:
+        estado['usuario'] = u
+        print('=== Perfil: %s ===' % u['login'])
+        print('Nome: %s | Repos públicos: %d | Seguidores: %d' % (u.get('name'), u['public_repos'], u['followers']))
+
+def listar_repos():
+    if not estado['usuario']:
+        print('Busque um usuário primeiro')
+        return
+    repos, pagina = [], 1
+    while True:
+        lote = get('/users/%s/repos' % estado['usuario']['login'], {'page': pagina, 'per_page': 100})
+        if not lote:
+            break
+        repos.extend(lote)
+        pagina += 1
+    estado['repos'] = repos
+    print('=== Repositórios ===')
+    for i, r in enumerate(repos, 1):
+        print('%d. %-20s ★ %-7d (%s)' % (i, r['name'], r['stargazers_count'], r['language']))
+
+def detalhar():
+    if not estado['usuario']:
+        print('Busque um usuário primeiro')
+        return
+    nome = input('Repositório: ').strip()
+    r = get('/repos/%s/%s' % (estado['usuario']['login'], nome))
+    if r:
+        print('%s | ★ %d | forks %d | %s' % (r['full_name'], r['stargazers_count'], r['forks_count'], r['language']))
+        print(r.get('description'))
+
+def salvar():
+    if not estado['usuario']:
+        print('Nada para salvar')
+        return
+    arquivo = 'github_%s.json' % estado['usuario']['login']
+    with open(arquivo, 'w', encoding='utf-8') as f:
+        json.dump(estado, f, ensure_ascii=False, indent=2)
+    print('Resultados salvos em', arquivo)
+
+MENU = {'1': buscar_usuario, '2': listar_repos, '3': detalhar, '4': salvar}
+while True:
+    print('[1] Buscar usuário [2] Listar repositórios [3] Detalhar repositório [4] Salvar JSON [5] Sair')
+    op = input('> ').strip()
+    if op == '5':
+        break
+    MENU.get(op, lambda: print('Opção inválida'))()

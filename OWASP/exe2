@@ -1,0 +1,12 @@
+import os
+import mysql.connector
+from werkzeug.security import generate_password_hash
+
+con = mysql.connector.connect(host='localhost', user='root',
+                              password=os.environ['MYSQL_PASSWORD'], database='seguranca')
+cur = con.cursor()
+cur.execute('CREATE TABLE IF NOT EXISTS usuarios_login (usuario VARCHAR(50) PRIMARY KEY, senha_hash VARCHAR(255) NOT NULL)')
+for u, s in (('admin', 'Cyber@2024'), ('analista', 'S3gur4nca!')):
+    cur.execute('REPLACE INTO usuarios_login (usuario, senha_hash) VALUES (%s, %s)', (u, generate_password_hash(s)))
+con.commit()
+con.close()

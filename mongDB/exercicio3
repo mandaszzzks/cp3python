@@ -1,0 +1,14 @@
+def consultar(fonte=None, tipo=None, ip=None, desde=None):
+    filtro = {}
+    if fonte is not None:
+        filtro['fonte'] = fonte
+    if tipo is not None:
+        filtro['tipo'] = tipo
+    if ip is not None:
+        filtro['ip'] = ip
+    if desde is not None:
+        filtro['timestamp'] = {'$gte': desde}
+    return list(col.find(filtro, {'_id': 0}).sort('timestamp', 1))
+
+print(consultar(tipo='FAIL', ip='185.220.101.1'))   # só as falhas desse IP
+print(len(consultar(fonte='auth')))                 # todos os eventos de auth

@@ -1,0 +1,78 @@
+import os
+import mysql.connector
+from flask import Flask, jsonify, request
+
+app = Flask(__name__)
+
+def get_db():
+    return mysql.connector.connect(host='localhost', user='root',
+                                   password=os.environ['MYSQL_PASSWORD'],
+                                   database='seguranca', connection_timeout=3)
+
+@app.errorhandler(mysql.connector.Error)
+def erro_banco(e):
+    app.logger.error('Erro de banco: %s', e)          # detalhe só no log
+    return jsonify({'erro': 'serviço indisponível'}), 500
+
+def executar(sql, params=(), leitura=False):
+    con = get_db()
+    try:
+        cur = con.cursor(dictionary=True)
+        cur.execute(sql, params)                       # sempre parametrizado
+        if leitura:
+            return cur.fetchall()
+        con.commit()
+        return cur.rowcount, cur.lastrowid
+    finally:
+        con.close()
+
+@app.route('/api/usuarios', methods=['GET'])
+def listar():
+    return jsonify(executar('SELECT id, nome, email, nivel_acesso FROM usuarios', leitura=True))
+
+@app.route('/api/usuarios/<int:id>', methods=['GET'])
+def obter(id):
+    rows = executar('SELECT id, nome, email, nivel_acesso FROM usuarios WHERE id = %s', (id,), leitura=True)
+    if not rows:
+        return jsonify({'erro': 'não encontrado'}), 404
+    return jsonify(rows[0])
+
+@app.route('/api/usuarios', methods=['POST'])
+def criar():
+    d = request.get_json(silent=True)
+    if not isinstance(d, dict) or not d.get('nome') or not d.get('email'):
+        return jsonify({'erro': 'nome e email obrigatórios'}), 400
+    nivel = d.get('nivel_acesso', 1)
+    if not isinstance(nivel, int) or not 1 <= nivel <= 5:
+        return jsonify({'erro': 'nível inválido'}), 400
+    try:
+        _, novo_id = executar('INSERT INTO usuarios (nome, email, nivel_acesso) VALUES (%s, %s, %s)',
+                              (d['nome'], d['email'], nivel))
+    except mysql.connector.IntegrityError:
+        return jsonify({'erro': 'email já cadastrado'}), 409
+    return jsonify({'id': novo_id}), 201
+
+@app.route('/api/usuarios/<int:id>', methods=['PUT'])
+def atualizar(id):
+    d = request.get_json(silent=True)
+    if not isinstance(d, dict):
+        return jsonify({'erro': 'corpo inválido'}), 400
+    if not executar('SELECT id FROM usuarios WHERE id = %s', (id,), leitura=True):
+        return jsonify({'erro': 'não encontrado'}), 404   # checo antes: UPDATE sem mudança retorna 0 linhas
+    nivel = d.get('nivel_acesso')
+    if nivel is not None and (not isinstance(nivel, int) or not 1 <= nivel <= 5):
+        return jsonify({'erro': 'nível inválido'}), 400
+    try:
+        executar('UPDATE usuarios SET nome = COALESCE(%s, nome), email = COALESCE(%s, email), '
+                 'nivel_acesso = COALESCE(%s, nivel_acesso) WHERE id = %s',
+                 (d.get('nome'), d.get('email'), nivel, id))
+    except mysql.connector.IntegrityError:
+        return jsonify({'erro': 'email já cadastrado'}), 409
+    return jsonify({'mensagem': 'Atualizado'})
+
+@app.route('/api/usuarios/<int:id>', methods=['DELETE'])
+def remover(id):
+    linhas, _ = executar('DELETE FROM usuarios WHERE id = %s', (id,))
+    if linhas == 0:
+        return jsonify({'erro': 'não encontrado'}), 404
+    return jsonify({'mensagem': 'Removido'})

@@ -1,0 +1,44 @@
+import ipaddress
+import time
+import requests
+
+SUSPEITOS = {'185.220.101.1', '45.33.32.156', '91.240.118.172'}
+cache = {}
+stats = {'http': 0, 'cache': 0, 'internos': 0}
+
+def consultar(ip, tentativas=3):
+    for i in range(tentativas):
+        r = requests.get('https://ipinfo.io/%s/json' % ip, timeout=10)
+        if r.status_code == 429:
+            time.sleep(2 ** i)
+            continue
+        r.raise_for_status()
+        return r.json()
+    return None
+
+def enriquecer(ip):
+    try:
+        privado = ipaddress.ip_address(ip).is_private
+    except ValueError:
+        return '%-15s -> IP inválido' % ip
+    if privado:
+        stats['internos'] += 1
+        return '%-15s -> Rede Interna (não consultado)' % ip
+    if ip in cache:
+        stats['cache'] += 1
+        return '%-15s -> [CACHE] sem nova chamada HTTP' % ip
+    try:
+        dados = consultar(ip)
+    except requests.exceptions.RequestException:
+        return '%-15s -> erro na consulta' % ip
+    if not dados:
+        return '%-15s -> limite de requisições' % ip
+    cache[ip] = dados
+    stats['http'] += 1
+    marca = 'EXTERNO, suspeito' if ip in SUSPEITOS else 'EXTERNO'
+    return '%-15s -> %s / %s / %s (%s)' % (ip, dados.get('city'), dados.get('country'), dados.get('org'), marca)
+
+ips = ['8.8.8.8', '1.1.1.1', '185.220.101.1', '192.168.1.10', '8.8.8.8']
+for ip in ips:
+    print(enriquecer(ip))
+print('=== Resumo === Consultas HTTP: %d | Cache hits: %d | Internos: %d' % (stats['http'], stats['cache'], stats['internos']))

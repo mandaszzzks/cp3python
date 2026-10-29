@@ -1,0 +1,13 @@
+import docker
+
+client = docker.from_env()
+containers = client.containers.list(all=True)
+
+print('%-14s %-10s %s' % ('NOME', 'STATUS', 'IMAGEM'))
+for c in containers:
+    imagem = c.image.tags[0] if c.image.tags else c.image.short_id
+    aviso = '' if c.status == 'running' else '   <- PARADO'
+    print('%-14s %-10s %s%s' % (c.name, c.status, imagem, aviso))
+
+rodando = sum(1 for c in containers if c.status == 'running')
+print('Total: %d | Rodando: %d | Parados: %d' % (len(containers), rodando, len(containers) - rodando))

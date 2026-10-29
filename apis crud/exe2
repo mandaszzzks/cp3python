@@ -1,0 +1,25 @@
+from flask import Flask, jsonify, request
+
+app = Flask(__name__)
+
+CRITERIOS = {
+    'tamanho_min': lambda s: len(s) >= 8,
+    'maiuscula': lambda s: any(c.isupper() for c in s),
+    'minuscula': lambda s: any(c.islower() for c in s),
+    'numero': lambda s: any(c.isdigit() for c in s),
+    'especial': lambda s: any(not c.isalnum() for c in s),
+}
+
+def verificar_senha(senha):
+    criterios = {nome: regra(senha) for nome, regra in CRITERIOS.items()}
+    atendidos = sum(criterios.values())
+    forca = {5: 'Muito forte', 4: 'Forte', 3: 'Média'}.get(atendidos, 'Fraca')
+    return forca, criterios
+
+@app.route('/api/analisar-senha', methods=['POST'])
+def analisar():
+    d = request.get_json(silent=True)
+    if not isinstance(d, dict) or not isinstance(d.get('senha'), str) or not d['senha']:
+        return jsonify({'erro': "campo 'senha' obrigatório"}), 400
+    forca, criterios = verificar_senha(d['senha'])
+    return jsonify({'forca': forca, 'criterios': criterios})

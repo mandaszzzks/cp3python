@@ -1,0 +1,40 @@
+import time
+import docker
+import requests
+from docker.errors import APIError, NotFound
+
+client = docker.from_env()
+NOME = 'nginx_lab'
+PORTA = 8080
+
+try:
+    client.containers.get(NOME).remove(force=True)
+except NotFound:
+    pass
+
+print('Subindo Nginx...')
+try:
+    c = client.containers.run('nginx:latest', detach=True, name=NOME, ports={'80/tcp': PORTA})
+except APIError as e:
+    msg = str(e).lower()
+    if 'already allocated' in msg or 'address already in use' in msg:
+        print('Erro: porta %d em uso' % PORTA)
+    else:
+        print('Erro do Docker:', e)
+    raise SystemExit(1)
+
+try:
+    for _ in range(10):
+        try:
+            r = requests.get('http://localhost:%d' % PORTA, timeout=2)
+            print('Nginx respondeu: %d' % r.status_code)
+            break
+        except requests.exceptions.RequestException:
+            time.sleep(1)
+    else:
+        print('Nginx não respondeu a tempo')
+finally:
+    print('Derrubando e removendo contêiner...')
+    c.stop()
+    c.remove()
+    print('Concluído. Ambiente limpo.')

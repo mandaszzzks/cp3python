@@ -1,0 +1,15 @@
+from classificador import classificar
+
+logs = [
+    'GET /index.html ip=192.168.1.10 status=200',
+    'GET /../../etc/passwd ip=91.240.118.172 status=400',
+    'POST /login ip=185.220.101.1 status=401 (5x seguidas)',
+]
+
+contagem = {'NORMAL': 0, 'SUSPEITO': 0, 'CRITICO': 0}
+for log in logs:
+    rotulo = classificar(log)
+    contagem[rotulo] += 1
+    print('[%s] %s' % (rotulo, log))
+
+print('=== Resumo === NORMAL:%d | SUSPEITO:%d | CRITICO:%d' % (contagem['NORMAL'], contagem['SUSPEITO'], contagem['CRITICO']))

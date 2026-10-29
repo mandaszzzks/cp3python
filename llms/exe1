@@ -1,0 +1,23 @@
+import os
+from openai import OpenAI
+
+client = OpenAI(api_key=os.environ['OPENAI_API_KEY'])
+historico = [{'role': 'system', 'content': 'Você é um analista de segurança sênior. Responda de forma curta e clara.'}]
+
+while True:
+    pergunta = input('Você: ').strip()
+    if pergunta == '/sair':
+        print('Assistente: Até logo!')
+        break
+    if not pergunta:
+        continue
+    historico.append({'role': 'user', 'content': pergunta})
+    try:
+        r = client.chat.completions.create(model='gpt-4o-mini', messages=historico)
+        resposta = r.choices[0].message.content
+    except Exception:
+        historico.pop()
+        print('Assistente: erro ao falar com a API, tente de novo.')
+        continue
+    historico.append({'role': 'assistant', 'content': resposta})
+    print('Assistente:', resposta)

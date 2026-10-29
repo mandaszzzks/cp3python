@@ -1,0 +1,67 @@
+from flask import Flask, jsonify, request
+
+app = Flask(__name__)
+usuarios = []
+prox_id = 1
+
+def achar(id):
+    return next((u for u in usuarios if u['id'] == id), None)
+
+def validar(d, id_atual=None):
+    if 'nome' in d and not str(d['nome']).strip():
+        return 'nome inválido'
+    if 'nivel' in d and (not isinstance(d['nivel'], int) or not 1 <= d['nivel'] <= 5):
+        return 'nível inválido'
+    if 'email' in d and any(u['email'] == d['email'] and u['id'] != id_atual for u in usuarios):
+        return 'email já existe'
+    return None
+
+@app.route('/api/usuarios', methods=['GET'])
+def listar():
+    return jsonify(usuarios)
+
+@app.route('/api/usuarios/<int:id>', methods=['GET'])
+def obter(id):
+    u = achar(id)
+    if u is None:
+        return jsonify({'erro': 'não encontrado'}), 404
+    return jsonify(u)
+
+@app.route('/api/usuarios', methods=['POST'])
+def criar():
+    global prox_id
+    d = request.get_json(silent=True)
+    if not isinstance(d, dict) or not all(k in d for k in ('nome', 'email', 'nivel')):
+        return jsonify({'erro': 'nome, email e nivel são obrigatórios'}), 400
+    erro = validar(d)
+    if erro:
+        return jsonify({'erro': erro}), 400
+    u = {'id': prox_id, 'nome': d['nome'], 'email': d['email'], 'nivel': d['nivel']}
+    usuarios.append(u)
+    prox_id += 1
+    return jsonify(u), 201
+
+@app.route('/api/usuarios/<int:id>', methods=['PUT'])
+def atualizar(id):
+    u = achar(id)
+    if u is None:
+        return jsonify({'erro': 'não encontrado'}), 404
+    d = request.get_json(silent=True)
+    if not isinstance(d, dict):
+        return jsonify({'erro': 'corpo inválido'}), 400
+    erro = validar(d, id_atual=id)
+    if erro:
+        return jsonify({'erro': erro}), 400
+    u.update({k: d[k] for k in ('nome', 'email', 'nivel') if k in d})
+    return jsonify(u)
+
+@app.route('/api/usuarios/<int:id>', methods=['DELETE'])
+def remover(id):
+    u = achar(id)
+    if u is None:
+        return jsonify({'erro': 'não encontrado'}), 404
+    usuarios.remove(u)
+    return jsonify({'mensagem': 'Removido'}), 200
+
+if __name__ == '__main__':
+    app.run(debug=False, port=5000)   # debug=False: hábito de segurança desde já
