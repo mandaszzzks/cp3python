@@ -1,14 +1,14 @@
 # Coding for Security — Resolução dos Exercícios (2º Semestre)
 
-Resolução dos exercícios da apostila de **Coding for Security** (Prof. Fabio Bara), 2º semestre.
+Resolução dos exercícios da apostila de **Coding for Security** 2º semestre
 
-**Autor:** [Amanda] · **Turma/RM:** [1TDCPF]
+**Autor:** Amanda · **Turma/RM:** 1TDCPF
 
 ---
 
 ## Declaração de uso de Inteligência Artificial
 
-Este trabalho foi feito **com a ajuda de IA**.
+Este trabalho foi feito **com a ajuda de IA**
 
 - **Ferramenta:** Claude (Anthropic).
 - **Como foi usada:** a IA ajudou a escrever as soluções dos exercícios a incrementação dos scripts de teste e a revisar o código.
