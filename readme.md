@@ -2,7 +2,7 @@
 
 Resolução dos exercícios da apostila de **Coding for Security** 2º semestre
 
-**Autor:** Amanda · **Turma/RM:** 1TDCPF
+**Autor:** Amanda · **Turma:** 1TDCPF
 
 ---
 
@@ -10,16 +10,13 @@ Resolução dos exercícios da apostila de **Coding for Security** 2º semestre
 
 Este trabalho foi feito **com a ajuda de IA**
 
-- **Ferramenta:** Claude (Anthropic).
-- **Como foi usada:** a IA ajudou a escrever as soluções dos exercícios a incrementação dos scripts de teste e a revisar o código.
-- **Minha participação:** [Eu fiz a base dos scripts e fui implementando ao pouco juntamente com a ia e testes]
-
-Declaro o uso de IA por transparência e por integridade acadêmica.
+- **Ferramenta:** Claude
+- **Como foi usada:** a IA ajudou a escrever as soluções dos exercícios a incrementação dos scripts de teste e a revisar o código
+- **Minha participação:** Eu fiz a base dos scripts e fui implementando ao pouco juntamente com a ia e testes
 
 ---
 
-## Conteúdo
-
+## Conteúdo que foi usado
 | Aula | Tema | Exercícios |
 |---|---|---|
 | 1 | SQL, NoSQL e CAP | 1.1 a 1.3 |
@@ -76,10 +73,3 @@ export OPENAI_API_KEY='sua-chave'   # apenas na Aula 13
 **Limitações conhecidas:** o Docker não foi testado contra um daemon real, e as chamadas ao NVD, ao ipinfo e à OpenAI foram simuladas. Teste esses pontos no seu ambiente antes de confiar neles.
 
 ---
-
-## Observações de segurança
-
-- Todas as consultas SQL com entrada do usuário são **parametrizadas**.
-- Nenhuma senha, chave de API ou string de conexão está escrita no código.
-- Os exercícios de SQL Injection e prompt injection são **defensivos** e rodam apenas em ambiente local de laboratório.
-- Arquivos `.pkl` só são carregados depois de conferir o hash SHA-256.
