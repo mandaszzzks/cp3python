@@ -1,40 +1,47 @@
-import time
-import docker
-import requests
-from docker.errors import APIError, NotFound
+import os
+from datetime import datetime
+from pymongo import MongoClient
 
-client = docker.from_env()
-NOME = 'nginx_lab'
-PORTA = 8080
+col = MongoClient(os.environ.get('MONGO_URI', 'mongodb://localhost:27017/'))['seguranca']['eventos']
+col.delete_many({'fonte': 'auth'})
 
+docs = []
+ignoradas = 0
 try:
-    client.containers.get(NOME).remove(force=True)
-except NotFound:
-    pass
-
-print('Subindo Nginx...')
-try:
-    c = client.containers.run('nginx:latest', detach=True, name=NOME, ports={'80/tcp': PORTA})
-except APIError as e:
-    msg = str(e).lower()
-    if 'already allocated' in msg or 'address already in use' in msg:
-        print('Erro: porta %d em uso' % PORTA)
-    else:
-        print('Erro do Docker:', e)
+    with open('auth.log', encoding='utf-8') as f:
+        for linha in f:
+            partes = linha.split()
+            if len(partes) < 5:
+                continue
+            try:
+                quando = datetime.strptime(partes[0] + ' ' + partes[1], '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                ignoradas += 1
+                continue
+            campos = dict(p.split('=', 1) for p in partes[3:] if '=' in p)
+            docs.append({
+                'timestamp': quando,
+                'fonte': 'auth',
+                'tipo': partes[2],
+                'ip': campos.get('ip'),
+                'detalhes': {'usuario': campos.get('usuario')},
+            })
+except FileNotFoundError:
+    print('auth.log não encontrado')
     raise SystemExit(1)
 
-try:
-    for _ in range(10):
-        try:
-            r = requests.get('http://localhost:%d' % PORTA, timeout=2)
-            print('Nginx respondeu: %d' % r.status_code)
-            break
-        except requests.exceptions.RequestException:
-            time.sleep(1)
-    else:
-        print('Nginx não respondeu a tempo')
-finally:
-    print('Derrubando e removendo contêiner...')
-    c.stop()
-    c.remove()
-    print('Concluído. Ambiente limpo.')
+if docs:
+    col.insert_many(docs)
+
+pipeline = [
+    {'$match': {'tipo': 'FAIL'}},
+    {'$group': {'_id': '$ip', 'total': {'$sum': 1}}},
+    {'$sort': {'total': -1}},
+    {'$limit': 5},
+]
+print('=== Top IPs por falhas de login ===')
+for l in col.aggregate(pipeline):
+    print('%s -> %d falhas' % (l['_id'], l['total']))
+print('Total de eventos inseridos:', len(docs))
+if ignoradas:
+    print('Linhas ignoradas (data inválida):', ignoradas)
